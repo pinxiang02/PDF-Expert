@@ -128,6 +128,28 @@ function App() {
     setShowSignature(false);
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type)) { alert('Please choose a PNG or JPG image.'); return; }
+    if (!pdfBuffer) { alert('Upload a PDF first!'); return; }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const img = new Image();
+      img.onload = () => {
+        const aspect = img.naturalWidth / img.naturalHeight;
+        const width = Math.min(280, img.naturalWidth);
+        addItem({ type: 'image', dataUrl, aspect, width, height: Math.round(width / aspect) });
+      };
+      img.onerror = () => setErrorMessage('Could not load that image.');
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCanvasDoubleClick = (e) => {
     if (!pdfBuffer || e.target !== canvasRef.current) return;
     const r = canvasRef.current.getBoundingClientRect();
@@ -231,6 +253,7 @@ function App() {
         onConvert={handleConvertUpload}
         onAddText={addTextBox}
         onAddTick={addTick}
+        onAddImage={handleImageUpload}
         onAddSignature={() => setShowSignature(true)}
         onWatermark={() => setShowWatermark(true)}
         onPreview={handlePreview}

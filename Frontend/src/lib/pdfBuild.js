@@ -64,10 +64,12 @@ export async function buildPdfBytes(pdfBuffer, items, pageDimensions, watermark 
     const scaleX = pdfW / dims.width;
     const scaleY = pdfH / dims.height;
 
-    if (item.type === 'signature') {
-      const png = await doc.embedPng(item.dataUrl);
+    if (item.type === 'signature' || item.type === 'image') {
+      // Signatures are always PNG; uploaded images may be JPEG or PNG.
+      const isJpg = /^data:image\/jpe?g/i.test(item.dataUrl);
+      const embedded = isJpg ? await doc.embedJpg(item.dataUrl) : await doc.embedPng(item.dataUrl);
       const h = item.height * scaleY;
-      page.drawImage(png, {
+      page.drawImage(embedded, {
         x: item.x * scaleX,
         y: pdfH - (item.y * scaleY) - h,
         width: item.width * scaleX,

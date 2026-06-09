@@ -42,9 +42,9 @@ export default function EditableItem({ item, selected, onSelect, onPointerDown, 
   let content;
   let controls;
 
-  if (item.type === 'signature') {
+  if (item.type === 'signature' || item.type === 'image') {
     content = (
-      <img src={item.dataUrl} alt="signature" width={item.width} height={item.height} style={{ display: 'block', pointerEvents: 'none' }} />
+      <img src={item.dataUrl} alt={item.type} width={item.width} height={item.height} style={{ display: 'block', pointerEvents: 'none' }} />
     );
     controls = (
       <select

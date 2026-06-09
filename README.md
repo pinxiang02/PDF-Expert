@@ -6,8 +6,9 @@ the result, and download it — all with an Apple-inspired interface.
 
 ## Features
 
-- **Edit PDFs** — place text boxes (font, size, bold, highlight), tick marks, and
-  hand-drawn signatures anywhere on the page; drag to reposition; multi-page support.
+- **Edit PDFs** — place text boxes (font, size, bold, highlight), tick marks,
+  images (PNG/JPG), and hand-drawn signatures anywhere on the page; drag to
+  reposition and resize; multi-page support.
 - **Watermark** — stamp configurable text (size, opacity, rotation, color) across
   every page.
 - **Convert to PDF**

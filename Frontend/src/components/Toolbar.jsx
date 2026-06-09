@@ -6,7 +6,7 @@ const label = { fontSize: 14, color: T.inkMuted80, textAlign: 'center', letterSp
 
 export default function Toolbar({
   pdfBuffer, fileName, hasOutput, hasWatermark, converting, totalPages, currentPage, zoom,
-  onUpload, onConvert, onAddText, onAddTick, onAddSignature, onWatermark, onPreview, onDownload,
+  onUpload, onConvert, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
   onPrevPage, onNextPage, onZoomIn, onZoomOut,
 }) {
   const en = !!pdfBuffer;
@@ -30,6 +30,10 @@ export default function Toolbar({
 
       <button onClick={onAddText} disabled={!en} style={pillGhost(en)}>Add Text</button>
       <button onClick={onAddTick} disabled={!en} style={pillGhost(en)}>Add Tick</button>
+      <label style={pillGhost(en)}>
+        Add Image
+        <input type="file" accept="image/png,image/jpeg" disabled={!en} onChange={onAddImage} style={{ display: 'none' }} />
+      </label>
       <button onClick={onAddSignature} disabled={!en} style={pillGhost(en)}>Add Signature</button>
       <button onClick={onWatermark} disabled={!en} style={hasWatermark ? pillPrimary(en) : pillGhost(en)}>
         {hasWatermark ? 'Watermark ✓' : 'Watermark'}
