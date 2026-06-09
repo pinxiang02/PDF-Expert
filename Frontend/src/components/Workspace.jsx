@@ -47,6 +47,7 @@ export default function Workspace({
           <EditableItem
             key={item.id}
             item={item}
+            zoom={zoom}
             selected={item.id === selectedId}
             onSelect={onSelect}
             {...dragHandlers}

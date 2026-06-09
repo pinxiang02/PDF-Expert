@@ -1,21 +1,46 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { T, frostedBar, miniSelect, toolBtn } from '../lib/theme';
 import { FONT_FAMILIES, cssFontFamily } from '../lib/fonts';
 import { tickPoints, tickThickness } from '../lib/shapes';
 
 const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32];
 const TICK_SIZES = [16, 20, 24, 32, 40, 56];
-const SIG_WIDTHS = [120, 160, 200, 260, 320];
 
 // One placed overlay: text box, signature image, or tick. The content sits at
 // the item's origin (x, y) so it maps 1:1 to the baked PDF position; the control
 // bar floats just outside the content so it never shifts the anchor point.
 // Controls only appear on hover / focus / drag so they don't block the document.
-export default function EditableItem({ item, selected, onSelect, onPointerDown, onPointerMove, onPointerUp, onUpdate, onDelete }) {
+export default function EditableItem({ item, zoom = 1, selected, onSelect, onPointerDown, onPointerMove, onPointerUp, onUpdate, onDelete }) {
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const resizeState = useRef(null);
   const active = hover || dragging || selected;
   const toolbarBelow = item.y < 44;
+  const resizable = item.type === 'signature' || item.type === 'image';
+
+  const onResizeDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.target.setPointerCapture(e.pointerId);
+    setDragging(true);
+    resizeState.current = { startX: e.clientX, origW: item.width };
+  };
+
+  const onResizeMove = (e) => {
+    const rs = resizeState.current;
+    if (!rs) return;
+    // Screen deltas are in zoomed pixels; divide by zoom for canvas-space width.
+    const aspect = item.aspect || 1;
+    const w = Math.max(24, rs.origW + (e.clientX - rs.startX) / zoom);
+    onUpdate(item.id, { width: Math.round(w), height: Math.round(w / aspect) });
+  };
+
+  const onResizeUp = (e) => {
+    if (!resizeState.current) return;
+    try { e.target.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+    resizeState.current = null;
+    setDragging(false);
+  };
 
   const dragHandle = (
     <span
@@ -46,16 +71,8 @@ export default function EditableItem({ item, selected, onSelect, onPointerDown, 
     content = (
       <img src={item.dataUrl} alt={item.type} width={item.width} height={item.height} style={{ display: 'block', pointerEvents: 'none' }} />
     );
-    controls = (
-      <select
-        title="Size"
-        value={item.width}
-        onChange={(e) => { const w = Number(e.target.value); onUpdate(item.id, { width: w, height: Math.round(w / item.aspect) }); }}
-        style={miniSelect}
-      >
-        {SIG_WIDTHS.map((w) => <option key={w} value={w}>{w}px</option>)}
-      </select>
-    );
+    // Resized via the corner drag handle below; no dropdown needed.
+    controls = <span style={{ fontSize: 11, color: T.inkMuted48 }}>{item.width}px</span>;
   } else if (item.type === 'tick') {
     const s = item.size;
     const pts = tickPoints(s).map((p) => `${p.x},${p.y}`).join(' ');
@@ -120,6 +137,28 @@ export default function EditableItem({ item, selected, onSelect, onPointerDown, 
       onMouseDown={() => onSelect(item.id)}
     >
       {content}
+      {active && resizable && (
+        <span
+          title="Drag to resize"
+          onPointerDown={onResizeDown}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: 0,
+            width: 14,
+            height: 14,
+            transform: 'translate(50%, 50%)',
+            borderRadius: 3,
+            background: T.blue,
+            border: '2px solid #fff',
+            cursor: 'nwse-resize',
+            touchAction: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      )}
       {active && (
         <div
           style={{
