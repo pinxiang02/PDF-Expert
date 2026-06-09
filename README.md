@@ -4,6 +4,15 @@ A browser-based PDF tool. Upload a PDF (or convert a Word / PowerPoint / Excel /
 image file into one), then add text, ticks, signatures and watermarks, preview
 the result, and download it — all with an Apple-inspired interface.
 
+## Live demo
+
+**[https://pdf-expert-virid.vercel.app/](https://pdf-expert-virid.vercel.app/)**
+
+The hosted demo runs the frontend on Vercel, so everything that works in the
+browser is available: PDF editing, watermarks, image → PDF, signatures, and dark
+mode. Word/PowerPoint/Excel conversion needs the LibreOffice backend running and
+reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
+
 ## Features
 
 - **Edit PDFs** — place text boxes (font, size, bold, highlight), tick marks,
