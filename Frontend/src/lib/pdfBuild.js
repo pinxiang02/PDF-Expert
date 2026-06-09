@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { standardFontFor } from './fonts';
 import { tickPoints, tickThickness } from './shapes';
 
@@ -6,7 +6,9 @@ import { tickPoints, tickThickness } from './shapes';
 // source PDF and return the resulting bytes. Item coordinates are stored in the
 // on-screen canvas space (RENDER_SCALE); pageDimensions[page] holds that canvas
 // size, which we use to map back into the PDF's real point space.
-export async function buildPdfBytes(pdfBuffer, items, pageDimensions) {
+// `watermark` (optional): { text, fontSize, opacity, rotation, color: {r,g,b} }
+// is stamped diagonally across the centre of every page.
+export async function buildPdfBytes(pdfBuffer, items, pageDimensions, watermark = null) {
   const doc = await PDFDocument.load(pdfBuffer.slice(0));
 
   // Many PDFs are fillable forms whose interactive field widgets render on top
@@ -26,6 +28,29 @@ export async function buildPdfBytes(pdfBuffer, items, pageDimensions) {
     if (!fontCache[key]) fontCache[key] = await doc.embedFont(standardFontFor(family, bold));
     return fontCache[key];
   };
+
+  if (watermark && watermark.text) {
+    const wmFont = await getFont('Helvetica', true);
+    const { r, g, b } = watermark.color || { r: 0.6, g: 0.6, b: 0.6 };
+    const rotation = watermark.rotation ?? 45;
+    const rad = (rotation * Math.PI) / 180;
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      const size = watermark.fontSize || 60;
+      const textW = wmFont.widthOfTextAtSize(watermark.text, size);
+      // Anchor so the rotated text stays centred on the page.
+      const cx = width / 2;
+      const cy = height / 2;
+      const x = cx - (textW / 2) * Math.cos(rad);
+      const y = cy - (textW / 2) * Math.sin(rad);
+      page.drawText(watermark.text, {
+        x, y, size, font: wmFont,
+        color: rgb(r, g, b),
+        opacity: watermark.opacity ?? 0.3,
+        rotate: degrees(rotation),
+      });
+    }
+  }
 
   for (const item of items) {
     const pageIndex = (item.page || 1) - 1;

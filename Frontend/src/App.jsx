@@ -2,10 +2,12 @@ import { useState, useRef, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { T } from './lib/theme';
 import { buildPdfBytes } from './lib/pdfBuild';
+import { convertToPdf } from './lib/convert';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
 import SignatureModal from './components/SignatureModal';
 import PreviewModal from './components/PreviewModal';
+import WatermarkModal from './components/WatermarkModal';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -26,6 +28,9 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [showSignature, setShowSignature] = useState(false);
+  const [showWatermark, setShowWatermark] = useState(false);
+  const [watermark, setWatermark] = useState(null);
+  const [converting, setConverting] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
   const canvasRef = useRef(null);
@@ -43,6 +48,23 @@ function App() {
     await page.render({ canvasContext: ctx, viewport }).promise;
   }, []);
 
+  // Load raw PDF bytes into the editor (shared by upload and convert flows).
+  const loadPdfBytes = async (arrayBuffer, name) => {
+    setFileName(name);
+    setItems([]);
+    setWatermark(null);
+    setZoom(1);
+
+    // Keep the original bytes for pdf-lib; pdf.js detaches whatever buffer it receives.
+    setPdfBuffer(arrayBuffer.slice(0));
+
+    const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    setPdfJsDoc(doc);
+    setTotalPages(doc.numPages);
+    setCurrentPage(1);
+    await renderPage(doc, 1);
+  };
+
   const handleFileUpload = async (e) => {
     setErrorMessage('');
     const file = e.target.files[0];
@@ -50,24 +72,31 @@ function App() {
       alert('Please upload a valid PDF file.');
       return;
     }
-
-    setFileName(file.name);
-    setItems([]);
-    setZoom(1);
-
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      // Keep the original bytes for pdf-lib; pdf.js detaches whatever buffer it receives.
-      setPdfBuffer(arrayBuffer.slice(0));
-
-      const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      setPdfJsDoc(doc);
-      setTotalPages(doc.numPages);
-      setCurrentPage(1);
-      await renderPage(doc, 1);
+      await loadPdfBytes(await file.arrayBuffer(), file.name);
     } catch (err) {
       console.error('PDF render error:', err);
       setErrorMessage(`Failed to render PDF: ${err.message}`);
+    }
+  };
+
+  const handleConvertUpload = async (e) => {
+    setErrorMessage('');
+    const file = e.target.files[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+
+    setConverting(true);
+    try {
+      const bytes = await convertToPdf(file);
+      const pdfName = file.name.replace(/\.[^.]+$/, '.pdf');
+      // bytes is a Uint8Array; hand pdf.js/pdf-lib their own ArrayBuffer copies.
+      await loadPdfBytes(bytes.buffer.slice(0), pdfName);
+    } catch (err) {
+      console.error('Convert error:', err);
+      setErrorMessage(`Failed to convert: ${err.message}`);
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -139,7 +168,7 @@ function App() {
   const handlePreview = async () => {
     if (!pdfBuffer) return;
     try {
-      const bytes = await buildPdfBytes(pdfBuffer, items, pageDimensions);
+      const bytes = await buildPdfBytes(pdfBuffer, items, pageDimensions, watermark);
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(url);
@@ -157,7 +186,7 @@ function App() {
   const handleDownload = async () => {
     if (!pdfBuffer) return;
     try {
-      const bytes = await buildPdfBytes(pdfBuffer, items, pageDimensions);
+      const bytes = await buildPdfBytes(pdfBuffer, items, pageDimensions, watermark);
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -178,6 +207,7 @@ function App() {
   const canvasDims = pageDimensions[currentPage] || { width: 0, height: 0 };
   const visibleItems = items.filter((it) => (it.page || 1) === currentPage);
   const hasItems = items.length > 0;
+  const hasOutput = hasItems || !!watermark;
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px 64px' }}>
@@ -185,20 +215,24 @@ function App() {
         PDF Form Filler
       </h1>
       <p style={{ margin: '0 0 28px', fontSize: 17, color: T.inkMuted48, letterSpacing: '-0.374px' }}>
-        Upload a PDF, place text, ticks and signatures, then preview and download.
+        Upload or convert a file to PDF, add text, ticks, signatures and watermarks, then preview and download.
       </p>
 
       <Toolbar
         pdfBuffer={pdfBuffer}
         fileName={fileName}
-        hasItems={hasItems}
+        hasOutput={hasOutput}
+        hasWatermark={!!watermark}
+        converting={converting}
         totalPages={totalPages}
         currentPage={currentPage}
         zoom={zoom}
         onUpload={handleFileUpload}
+        onConvert={handleConvertUpload}
         onAddText={addTextBox}
         onAddTick={addTick}
         onAddSignature={() => setShowSignature(true)}
+        onWatermark={() => setShowWatermark(true)}
         onPreview={handlePreview}
         onDownload={handleDownload}
         onPrevPage={() => goToPage(currentPage - 1)}
@@ -242,6 +276,14 @@ function App() {
       )}
 
       {showSignature && <SignatureModal onCancel={() => setShowSignature(false)} onAdd={addSignature} />}
+      {showWatermark && (
+        <WatermarkModal
+          current={watermark}
+          onApply={(wm) => { setWatermark(wm); setShowWatermark(false); }}
+          onRemove={() => { setWatermark(null); setShowWatermark(false); }}
+          onCancel={() => setShowWatermark(false)}
+        />
+      )}
       {previewUrl && <PreviewModal url={previewUrl} fileName={fileName} onDownload={handleDownload} onClose={closePreview} />}
     </div>
   );
