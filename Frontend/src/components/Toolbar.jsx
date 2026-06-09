@@ -8,6 +8,7 @@ const rowStyle = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wr
 
 export default function Toolbar({
   pdfBuffer, fileName, hasOutput, hasWatermark, converting, totalPages, currentPage, zoom,
+  canUndo, canRedo, onUndo, onRedo,
   onUpload, onConvert, onMerge, onFileNameChange, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
   onPrevPage, onNextPage, onZoomIn, onZoomOut,
 }) {
@@ -53,6 +54,8 @@ export default function Toolbar({
 
       {/* Row 2 — editing tools & view controls */}
       <div style={rowStyle}>
+        <button onClick={onUndo} disabled={!canUndo} style={navBtn(!!canUndo)} title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button onClick={onRedo} disabled={!canRedo} style={navBtn(!!canRedo)} title="Redo (Ctrl+Y)">↷ Redo</button>
         <button onClick={onAddText} disabled={!en} style={pillGhost(en)}>Add Text</button>
         <button onClick={onAddTick} disabled={!en} style={pillGhost(en)}>Add Tick</button>
         <label style={pillGhost(en)}>

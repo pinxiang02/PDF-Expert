@@ -8,10 +8,17 @@ const THUMB_WIDTH = 132;
 // its thumbnail is clicked. Pages can be dragged to reorder them (onReorder).
 // Rendering runs sequentially so we never kick off two render tasks for the same
 // page object at once.
-export default function Thumbnails({ pdfJsDoc, totalPages, currentPage, onSelect, onReorder }) {
+export default function Thumbnails({ pdfJsDoc, totalPages, currentPage, pagesWithItems, onSelect, onReorder, onDeletePage, onRotatePage }) {
   const canvasRefs = useRef([]);
   const [dragPage, setDragPage] = useState(null);
   const [overPage, setOverPage] = useState(null);
+  const [hoverPage, setHoverPage] = useState(null);
+
+  const pageBtn = {
+    width: 22, height: 22, borderRadius: 6, cursor: 'pointer', lineHeight: 1,
+    fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: `1px solid ${T.hairline}`, background: 'rgba(255,255,255,0.95)', color: T.inkMuted80,
+  };
 
   useEffect(() => {
     if (!pdfJsDoc) return;
@@ -65,7 +72,7 @@ export default function Thumbnails({ pdfJsDoc, totalPages, currentPage, onSelect
       }}
     >
       <span style={{ fontSize: 11, color: T.inkMuted48, textAlign: 'center', letterSpacing: '-0.1px' }}>
-        Click to view · drag to reorder
+        {totalPages > 1 ? 'Click to view · drag to reorder · hover for ⟳ ✕' : 'Hover a page for ⟳ rotate'}
       </span>
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => {
         const isCurrent = n === currentPage;
@@ -76,6 +83,8 @@ export default function Thumbnails({ pdfJsDoc, totalPages, currentPage, onSelect
             key={n}
             draggable
             onClick={() => onSelect(n)}
+            onMouseEnter={() => setHoverPage(n)}
+            onMouseLeave={() => setHoverPage((p) => (p === n ? null : p))}
             onDragStart={() => setDragPage(n)}
             onDragOver={(e) => { e.preventDefault(); if (overPage !== n) setOverPage(n); }}
             onDragLeave={() => setOverPage((p) => (p === n ? null : p))}
@@ -92,18 +101,40 @@ export default function Thumbnails({ pdfJsDoc, totalPages, currentPage, onSelect
               paddingTop: 2,
             }}
           >
-            <canvas
-              ref={(el) => { canvasRefs.current[n - 1] = el; }}
-              style={{
-                width: THUMB_WIDTH,
-                display: 'block',
-                background: T.canvas,
-                borderRadius: 6,
-                border: `2px solid ${isCurrent ? T.blue : T.hairline}`,
-                boxShadow: isCurrent ? `0 0 0 1px ${T.blue}` : 'none',
-                pointerEvents: 'none',
-              }}
-            />
+            <div style={{ position: 'relative', width: THUMB_WIDTH }}>
+              <canvas
+                ref={(el) => { canvasRefs.current[n - 1] = el; }}
+                style={{
+                  width: THUMB_WIDTH,
+                  display: 'block',
+                  background: T.canvas,
+                  borderRadius: 6,
+                  border: `2px solid ${isCurrent ? T.blue : T.hairline}`,
+                  boxShadow: isCurrent ? `0 0 0 1px ${T.blue}` : 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+              {hoverPage === n && (
+                <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4 }}>
+                  <button
+                    title={pagesWithItems?.has(n) ? 'Remove annotations on this page before rotating' : 'Rotate 90°'}
+                    onClick={(e) => { e.stopPropagation(); onRotatePage?.(n); }}
+                    disabled={pagesWithItems?.has(n)}
+                    style={{ ...pageBtn, opacity: pagesWithItems?.has(n) ? 0.4 : 1, cursor: pagesWithItems?.has(n) ? 'not-allowed' : 'pointer' }}
+                  >
+                    ⟳
+                  </button>
+                  <button
+                    title={totalPages <= 1 ? 'Cannot delete the only page' : 'Delete page'}
+                    onClick={(e) => { e.stopPropagation(); onDeletePage?.(n); }}
+                    disabled={totalPages <= 1}
+                    style={{ ...pageBtn, color: '#b00020', opacity: totalPages <= 1 ? 0.4 : 1, cursor: totalPages <= 1 ? 'not-allowed' : 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
             <span style={{ fontSize: 12, color: isCurrent ? T.blue : T.inkMuted48, fontWeight: isCurrent ? 600 : 400 }}>
               {n}
             </span>

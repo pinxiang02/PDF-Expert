@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { T, pillGhost } from './lib/theme';
 import { buildPdfBytes } from './lib/pdfBuild';
 import { convertToPdf } from './lib/convert';
-import { mergePdfs, reorderPdfPage } from './lib/merge';
+import { mergePdfs, reorderPdfPage, deletePdfPage, rotatePdfPage } from './lib/merge';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
 import Thumbnails from './components/Thumbnails';
@@ -36,6 +36,11 @@ function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
+  // Undo/redo history. Each entry is a snapshot of the editable document state.
+  const [past, setPast] = useState([]);
+  const [future, setFuture] = useState([]);
+  const isRestoring = useRef(false);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
@@ -56,12 +61,75 @@ function App() {
     await page.render({ canvasContext: ctx, viewport }).promise;
   }, []);
 
+  // --- Undo / redo -----------------------------------------------------------
+
+  // Capture the editable document state. pdfBuffer is copied because pdf.js
+  // detaches buffers it receives.
+  const snapshot = () => ({
+    pdfBuffer: pdfBuffer ? pdfBuffer.slice(0) : null,
+    items: items.map((it) => ({ ...it })),
+    pageDimensions: { ...pageDimensions },
+    totalPages,
+    currentPage,
+    fileName,
+    watermark: watermark ? { ...watermark, color: { ...watermark.color } } : null,
+  });
+
+  const restore = async (snap) => {
+    isRestoring.current = true;
+    setItems(snap.items.map((it) => ({ ...it })));
+    setPageDimensions({ ...snap.pageDimensions });
+    setTotalPages(snap.totalPages);
+    setFileName(snap.fileName);
+    setWatermark(snap.watermark);
+    setSelectedId(null);
+    if (snap.pdfBuffer) {
+      setPdfBuffer(snap.pdfBuffer.slice(0));
+      const doc = await pdfjsLib.getDocument({ data: snap.pdfBuffer.slice(0) }).promise;
+      setPdfJsDoc(doc);
+      setCurrentPage(snap.currentPage);
+      await renderPage(doc, snap.currentPage);
+    } else {
+      setPdfBuffer(null);
+      setPdfJsDoc(null);
+      setCurrentPage(1);
+    }
+    isRestoring.current = false;
+  };
+
+  // Record the current state so the next mutation can be undone. Call BEFORE
+  // mutating. No-op while restoring.
+  const commit = () => {
+    if (isRestoring.current) return;
+    setPast((p) => [...p.slice(-49), snapshot()]);
+    setFuture([]);
+  };
+
+  const undo = () => {
+    if (!past.length) return;
+    const prev = past[past.length - 1];
+    setFuture((f) => [snapshot(), ...f]);
+    setPast((p) => p.slice(0, -1));
+    restore(prev);
+  };
+
+  const redo = () => {
+    if (!future.length) return;
+    const next = future[0];
+    setPast((p) => [...p, snapshot()]);
+    setFuture((f) => f.slice(1));
+    restore(next);
+  };
+
   // Load raw PDF bytes into the editor (shared by upload and convert flows).
-  const loadPdfBytes = async (arrayBuffer, name) => {
+  // resetHistory clears undo/redo (a brand-new document); merge keeps it so the
+  // pre-merge document can be restored.
+  const loadPdfBytes = async (arrayBuffer, name, { resetHistory = true } = {}) => {
     setFileName(name);
     setItems([]);
     setWatermark(null);
     setZoom(1);
+    if (resetHistory) { setPast([]); setFuture([]); }
 
     // Keep the original bytes for pdf-lib; pdf.js detaches whatever buffer it receives.
     setPdfBuffer(arrayBuffer.slice(0));
@@ -127,9 +195,10 @@ function App() {
     if (sources.length < 2) { alert('Select at least two PDFs to merge (or open one first, then add another).'); return; }
 
     try {
+      commit(); // merge is undoable back to the pre-merge document
       const bytes = await mergePdfs(sources);
       const name = pdfBuffer ? `Merged_${fileName || 'document.pdf'}` : `Merged_${files[0].name}`;
-      await loadPdfBytes(bytes.buffer.slice(0), name);
+      await loadPdfBytes(bytes.buffer.slice(0), name, { resetHistory: false });
     } catch (err) {
       console.error('Merge error:', err);
       setErrorMessage(`Failed to merge PDFs: ${err.message}`);
@@ -153,6 +222,7 @@ function App() {
     const fromIdx = from - 1;
     const toIdx = to - 1;
     try {
+      commit();
       const { bytes, order } = await reorderPdfPage(pdfBuffer, fromIdx, toIdx);
       // order[newIdx] = oldIdx → invert to map oldPage(1-based) → newPage(1-based).
       const oldToNew = {};
@@ -182,8 +252,66 @@ function App() {
     }
   };
 
+  // Delete a page (1-based). Remaps overlays/dimensions to the new sequence and
+  // drops any overlays that were on the deleted page.
+  const deletePage = async (pageNum) => {
+    if (!pdfBuffer) return;
+    if (totalPages <= 1) { alert('A PDF must have at least one page.'); return; }
+    try {
+      commit();
+      const { bytes, order } = await deletePdfPage(pdfBuffer, pageNum - 1);
+      const oldToNew = {};
+      order.forEach((oldIdx, newIdx) => { oldToNew[oldIdx + 1] = newIdx + 1; });
+
+      setItems((prev) => prev.filter((it) => (it.page || 1) !== pageNum).map((it) => ({ ...it, page: oldToNew[it.page] || it.page })));
+      setPageDimensions((prev) => {
+        const next = {};
+        for (const [oldPage, dims] of Object.entries(prev)) {
+          const np = oldToNew[Number(oldPage)];
+          if (np) next[np] = dims;
+        }
+        return next;
+      });
+
+      setPdfBuffer(bytes.buffer.slice(0));
+      const doc = await pdfjsLib.getDocument({ data: bytes.buffer.slice(0) }).promise;
+      setPdfJsDoc(doc);
+      setTotalPages(doc.numPages);
+      const newCurrent = Math.min(currentPage, doc.numPages);
+      setCurrentPage(newCurrent);
+      await renderPage(doc, newCurrent);
+    } catch (err) {
+      console.error('Delete page error:', err);
+      setErrorMessage(`Failed to delete page: ${err.message}`);
+    }
+  };
+
+  // Rotate a page 90° clockwise. Only allowed when the page has no overlays, so
+  // overlay coordinates never go out of sync with the rotated orientation.
+  const rotatePage = async (pageNum) => {
+    if (!pdfBuffer) return;
+    if (items.some((it) => (it.page || 1) === pageNum)) {
+      alert('Remove the annotations on this page before rotating it.');
+      return;
+    }
+    try {
+      commit();
+      const bytes = await rotatePdfPage(pdfBuffer, pageNum - 1);
+      setPdfBuffer(bytes.buffer.slice(0));
+      // Drop the cached dimensions for this page so it re-renders with swapped w/h.
+      setPageDimensions((prev) => { const next = { ...prev }; delete next[pageNum]; return next; });
+      const doc = await pdfjsLib.getDocument({ data: bytes.buffer.slice(0) }).promise;
+      setPdfJsDoc(doc);
+      await renderPage(doc, currentPage);
+    } catch (err) {
+      console.error('Rotate page error:', err);
+      setErrorMessage(`Failed to rotate page: ${err.message}`);
+    }
+  };
+
   const addItem = (extra) => {
     if (!pdfBuffer) { alert('Upload a PDF first!'); return; }
+    commit();
     const id = Date.now() + Math.random();
     setItems((prev) => [...prev, { id, x: 50, y: 50, page: currentPage, ...extra }]);
     setSelectedId(id);
@@ -230,6 +358,7 @@ function App() {
 
   const updateItem = (id, changes) => setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...changes } : it)));
   const deleteItem = (id) => {
+    commit();
     setItems((prev) => prev.filter((it) => it.id !== id));
     setSelectedId((cur) => (cur === id ? null : cur));
   };
@@ -237,8 +366,26 @@ function App() {
   const onPointerDown = (e, item) => {
     e.preventDefault();
     e.target.setPointerCapture(e.pointerId);
+    commit(); // snapshot position before the drag
     dragState.current = { id: item.id, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y };
   };
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y (or Shift+Z) redo,
+  // Delete/Backspace removes the selected overlay (when not typing in a field).
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target;
+      const typing = t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId != null && !typing) { e.preventDefault(); deleteItem(selectedId); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [past, future, selectedId, items]);
 
   const onPointerMove = (e) => {
     const ds = dragState.current;
@@ -304,6 +451,7 @@ function App() {
   const visibleItems = items.filter((it) => (it.page || 1) === currentPage);
   const hasItems = items.length > 0;
   const hasOutput = hasItems || !!watermark;
+  const pagesWithItems = new Set(items.map((it) => it.page || 1));
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '40px 24px 64px' }}>
@@ -326,13 +474,16 @@ function App() {
       </div>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-        {pdfBuffer && totalPages > 1 && (
+        {pdfBuffer && (
           <Thumbnails
             pdfJsDoc={pdfJsDoc}
             totalPages={totalPages}
             currentPage={currentPage}
+            pagesWithItems={pagesWithItems}
             onSelect={goToPage}
             onReorder={reorderPages}
+            onDeletePage={deletePage}
+            onRotatePage={rotatePage}
           />
         )}
 
@@ -343,6 +494,10 @@ function App() {
         hasOutput={hasOutput}
         hasWatermark={!!watermark}
         converting={converting}
+        canUndo={past.length > 0}
+        canRedo={future.length > 0}
+        onUndo={undo}
+        onRedo={redo}
         totalPages={totalPages}
         currentPage={currentPage}
         zoom={zoom}
@@ -405,8 +560,8 @@ function App() {
       {showWatermark && (
         <WatermarkModal
           current={watermark}
-          onApply={(wm) => { setWatermark(wm); setShowWatermark(false); }}
-          onRemove={() => { setWatermark(null); setShowWatermark(false); }}
+          onApply={(wm) => { commit(); setWatermark(wm); setShowWatermark(false); }}
+          onRemove={() => { commit(); setWatermark(null); setShowWatermark(false); }}
           onCancel={() => setShowWatermark(false)}
         />
       )}

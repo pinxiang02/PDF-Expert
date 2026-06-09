@@ -22,8 +22,11 @@ reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
   every page.
 - **Merge PDFs** — combine two or more PDFs (or add files to the one you have
   open) into a single document.
-- **Reorder pages** — drag page thumbnails in the left panel to move a page
-  before or after another.
+- **Page management** — drag thumbnails to reorder pages, or hover a thumbnail to
+  rotate (90°) or delete a page.
+- **Undo / redo** — revert structural edits (add/move/delete overlays, page
+  reorder/delete/rotate, merge, watermark) with the toolbar buttons or
+  `Ctrl/Cmd+Z` and `Ctrl/Cmd+Y`. `Delete` removes the selected overlay.
 - **Convert to PDF**
   - **Images** (`.jpg`, `.jpeg`, `.png`) — converted entirely in your browser.
   - **Office docs** (`.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`) — converted
@@ -63,6 +66,12 @@ To create a production build instead:
 ```bash
 npm run build      # outputs to Frontend/dist
 npm run preview    # serve the build locally
+```
+
+Run the unit tests (page merge / reorder / delete / rotate logic):
+
+```bash
+npm test
 ```
 
 ### 2. Backend (optional — only for Office → PDF)

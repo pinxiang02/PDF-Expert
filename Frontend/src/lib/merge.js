@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 
 // Merge several PDFs (ArrayBuffers / Uint8Arrays) into one, preserving page
 // order across sources. Returns the combined PDF as a Uint8Array.
@@ -28,4 +28,28 @@ export async function reorderPdfPage(pdfBuffer, from, to) {
   order.splice(to, 0, from);
 
   return { bytes, order };
+}
+
+// Delete the page at 0-based index `idx`. Returns { bytes, order } where `order`
+// lists the original page indices that remain, in their new sequence (used to
+// remap overlays).
+export async function deletePdfPage(pdfBuffer, idx) {
+  const doc = await PDFDocument.load(pdfBuffer.slice(0));
+  doc.removePage(idx);
+  const bytes = await doc.save();
+
+  const order = [...Array(doc.getPageCount() + 1).keys()];
+  order.splice(idx, 1);
+
+  return { bytes, order };
+}
+
+// Rotate the page at 0-based index `idx` by `delta` degrees (default +90),
+// preserving any existing rotation. Returns the new PDF bytes.
+export async function rotatePdfPage(pdfBuffer, idx, delta = 90) {
+  const doc = await PDFDocument.load(pdfBuffer.slice(0));
+  const page = doc.getPage(idx);
+  const current = page.getRotation().angle || 0;
+  page.setRotation(degrees(((current + delta) % 360 + 360) % 360));
+  return doc.save();
 }
