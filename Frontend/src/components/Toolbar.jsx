@@ -38,9 +38,13 @@ export default function Toolbar({
             onChange={(e) => onFileNameChange(e.target.value)}
             placeholder="document.pdf"
             title="Rename the file (used for the downloaded PDF)"
+            spellCheck={false}
+            autoComplete="off"
             style={{
-              fontSize: 14, color: T.ink, padding: '8px 12px', minWidth: 200, maxWidth: 320,
-              border: `1px solid ${T.hairline}`, borderRadius: 9999, background: T.canvas,
+              fontSize: 14, color: T.ink, padding: '8px 12px',
+              // Rectangle that grows with the text length (clamped to a sensible range).
+              width: `${Math.min(Math.max((fileName?.length || 0) + 2, 12), 64)}ch`,
+              border: `1px solid ${T.hairline}`, borderRadius: 8, background: T.canvas,
               fontFamily: 'inherit', outline: 'none',
             }}
           />
