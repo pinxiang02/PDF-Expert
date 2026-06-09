@@ -20,6 +20,10 @@ reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
   reposition and resize; multi-page support.
 - **Watermark** — stamp configurable text (size, opacity, rotation, color) across
   every page.
+- **Merge PDFs** — combine two or more PDFs (or add files to the one you have
+  open) into a single document.
+- **Reorder pages** — drag page thumbnails in the left panel to move a page
+  before or after another.
 - **Convert to PDF**
   - **Images** (`.jpg`, `.jpeg`, `.png`) — converted entirely in your browser.
   - **Office docs** (`.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`) — converted

@@ -6,7 +6,7 @@ const label = { fontSize: 14, color: T.inkMuted80, textAlign: 'center', letterSp
 
 export default function Toolbar({
   pdfBuffer, fileName, hasOutput, hasWatermark, converting, totalPages, currentPage, zoom,
-  onUpload, onConvert, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
+  onUpload, onConvert, onMerge, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
   onPrevPage, onNextPage, onZoomIn, onZoomOut,
 }) {
   const en = !!pdfBuffer;
@@ -20,6 +20,11 @@ export default function Toolbar({
       <label style={converting ? pillGhost(false) : pillGhost(true)}>
         {converting ? 'Converting…' : 'Convert to PDF'}
         <input type="file" accept={ACCEPT_CONVERT} disabled={converting} onChange={onConvert} style={{ display: 'none' }} />
+      </label>
+
+      <label style={pillGhost(true)} title={en ? 'Add one or more PDFs to merge with the current one' : 'Select two or more PDFs to merge'}>
+        Merge PDFs
+        <input type="file" accept="application/pdf" multiple onChange={onMerge} style={{ display: 'none' }} />
       </label>
 
       {fileName && (

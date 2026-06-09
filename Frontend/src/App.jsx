@@ -3,6 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { T, pillGhost } from './lib/theme';
 import { buildPdfBytes } from './lib/pdfBuild';
 import { convertToPdf } from './lib/convert';
+import { mergePdfs, reorderPdfPage } from './lib/merge';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
 import Thumbnails from './components/Thumbnails';
@@ -107,6 +108,34 @@ function App() {
     }
   };
 
+  // Merge the selected PDFs (plus the one already open, if any) into a single
+  // document and load the result. Page order follows: current doc, then files in
+  // the order chosen.
+  const handleMergeUpload = async (e) => {
+    setErrorMessage('');
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+
+    const invalid = files.find((f) => f.type !== 'application/pdf');
+    if (invalid) { alert('Please select PDF files only.'); return; }
+
+    const sources = [];
+    if (pdfBuffer) sources.push(pdfBuffer.slice(0));
+    for (const f of files) sources.push(await f.arrayBuffer());
+
+    if (sources.length < 2) { alert('Select at least two PDFs to merge (or open one first, then add another).'); return; }
+
+    try {
+      const bytes = await mergePdfs(sources);
+      const name = pdfBuffer ? `Merged_${fileName || 'document.pdf'}` : `Merged_${files[0].name}`;
+      await loadPdfBytes(bytes.buffer.slice(0), name);
+    } catch (err) {
+      console.error('Merge error:', err);
+      setErrorMessage(`Failed to merge PDFs: ${err.message}`);
+    }
+  };
+
   const goToPage = async (pageNum) => {
     if (!pdfJsDoc || pageNum < 1 || pageNum > totalPages) return;
     setCurrentPage(pageNum);
@@ -114,6 +143,42 @@ function App() {
       await renderPage(pdfJsDoc, pageNum);
     } catch (err) {
       setErrorMessage(`Failed to render page ${pageNum}: ${err.message}`);
+    }
+  };
+
+  // Reorder pages when a thumbnail is dragged. `from`/`to` are 1-based page
+  // positions. Rebuilds the PDF and remaps overlays + dimensions to the new order.
+  const reorderPages = async (from, to) => {
+    if (!pdfBuffer || from === to) return;
+    const fromIdx = from - 1;
+    const toIdx = to - 1;
+    try {
+      const { bytes, order } = await reorderPdfPage(pdfBuffer, fromIdx, toIdx);
+      // order[newIdx] = oldIdx → invert to map oldPage(1-based) → newPage(1-based).
+      const oldToNew = {};
+      order.forEach((oldIdx, newIdx) => { oldToNew[oldIdx + 1] = newIdx + 1; });
+
+      setItems((prev) => prev.map((it) => ({ ...it, page: oldToNew[it.page || 1] || it.page })));
+      setPageDimensions((prev) => {
+        const next = {};
+        for (const [oldPage, dims] of Object.entries(prev)) {
+          const np = oldToNew[Number(oldPage)];
+          if (np) next[np] = dims;
+        }
+        return next;
+      });
+
+      const newBuffer = bytes.buffer.slice(0);
+      setPdfBuffer(newBuffer);
+      const doc = await pdfjsLib.getDocument({ data: bytes.buffer.slice(0) }).promise;
+      setPdfJsDoc(doc);
+      setTotalPages(doc.numPages);
+      const newCurrent = oldToNew[currentPage] || to;
+      setCurrentPage(newCurrent);
+      await renderPage(doc, newCurrent);
+    } catch (err) {
+      console.error('Reorder error:', err);
+      setErrorMessage(`Failed to reorder pages: ${err.message}`);
     }
   };
 
@@ -265,6 +330,7 @@ function App() {
             totalPages={totalPages}
             currentPage={currentPage}
             onSelect={goToPage}
+            onReorder={reorderPages}
           />
         )}
 
@@ -280,6 +346,7 @@ function App() {
         zoom={zoom}
         onUpload={handleFileUpload}
         onConvert={handleConvertUpload}
+        onMerge={handleMergeUpload}
         onAddText={addTextBox}
         onAddTick={addTick}
         onAddImage={handleImageUpload}
