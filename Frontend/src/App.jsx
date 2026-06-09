@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { T } from './lib/theme';
+import { T, pillGhost } from './lib/theme';
 import { buildPdfBytes } from './lib/pdfBuild';
 import { convertToPdf } from './lib/convert';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
+import Thumbnails from './components/Thumbnails';
 import SignatureModal from './components/SignatureModal';
 import PreviewModal from './components/PreviewModal';
 import WatermarkModal from './components/WatermarkModal';
@@ -32,6 +33,12 @@ function App() {
   const [watermark, setWatermark] = useState(null);
   const [converting, setConverting] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   const canvasRef = useRef(null);
   const dragState = useRef(null);
@@ -232,14 +239,36 @@ function App() {
   const hasOutput = hasItems || !!watermark;
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px 64px' }}>
-      <h1 style={{ margin: '0 0 4px', fontFamily: T.display, fontSize: 40, fontWeight: 600, letterSpacing: '-0.28px', lineHeight: 1.1, color: T.ink }}>
-        PDF Form Filler
-      </h1>
-      <p style={{ margin: '0 0 28px', fontSize: 17, color: T.inkMuted48, letterSpacing: '-0.374px' }}>
-        Upload or convert a file to PDF, add text, ticks, signatures and watermarks, then preview and download.
-      </p>
+    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '40px 24px 64px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 28 }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px', fontFamily: T.display, fontSize: 40, fontWeight: 600, letterSpacing: '-0.28px', lineHeight: 1.1, color: T.ink }}>
+            PDF Form Filler
+          </h1>
+          <p style={{ margin: 0, fontSize: 17, color: T.inkMuted48, letterSpacing: '-0.374px' }}>
+            Upload or convert a file to PDF, add text, ticks, signatures and watermarks, then preview and download.
+          </p>
+        </div>
+        <button
+          onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{ ...pillGhost(true), padding: '8px 16px', fontSize: 15, flexShrink: 0, whiteSpace: 'nowrap' }}
+        >
+          {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+        </button>
+      </div>
 
+      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+        {pdfBuffer && totalPages > 1 && (
+          <Thumbnails
+            pdfJsDoc={pdfJsDoc}
+            totalPages={totalPages}
+            currentPage={currentPage}
+            onSelect={goToPage}
+          />
+        )}
+
+        <div style={{ flex: 1, minWidth: 0 }}>
       <Toolbar
         pdfBuffer={pdfBuffer}
         fileName={fileName}
@@ -276,20 +305,22 @@ function App() {
         </div>
       )}
 
-      <Workspace
-        canvasRef={canvasRef}
-        pdfBuffer={pdfBuffer}
-        canvasDims={canvasDims}
-        zoom={zoom}
-        items={visibleItems}
-        errorMessage={errorMessage}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onCanvasDoubleClick={handleCanvasDoubleClick}
-        dragHandlers={{ onPointerDown, onPointerMove, onPointerUp }}
-        onUpdate={updateItem}
-        onDelete={deleteItem}
-      />
+      <div style={{ overflowX: 'auto' }}>
+        <Workspace
+          canvasRef={canvasRef}
+          pdfBuffer={pdfBuffer}
+          canvasDims={canvasDims}
+          zoom={zoom}
+          items={visibleItems}
+          errorMessage={errorMessage}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onCanvasDoubleClick={handleCanvasDoubleClick}
+          dragHandlers={{ onPointerDown, onPointerMove, onPointerUp }}
+          onUpdate={updateItem}
+          onDelete={deleteItem}
+        />
+      </div>
 
       {hasItems && (
         <div style={{ marginTop: 14, fontSize: 14, color: T.inkMuted48, letterSpacing: '-0.224px' }}>
@@ -297,6 +328,8 @@ function App() {
           {totalPages > 1 && ` across ${new Set(items.map((i) => i.page)).size} page(s)`}
         </div>
       )}
+        </div>
+      </div>
 
       {showSignature && <SignatureModal onCancel={() => setShowSignature(false)} onAdd={addSignature} />}
       {showWatermark && (

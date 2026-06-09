@@ -27,7 +27,7 @@ export default function SignatureModal({ onCancel, onAdd }) {
     if (!drawing.current) return;
     const p = pos(e);
     const ctx = canvasRef.current.getContext('2d');
-    ctx.strokeStyle = T.ink;
+    ctx.strokeStyle = '#1d1d1f';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -65,7 +65,7 @@ export default function SignatureModal({ onCancel, onAdd }) {
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
-        style={{ width: W, height: H, background: T.canvas, border: `1px dashed ${T.hairline}`, borderRadius: 11, touchAction: 'none', cursor: 'crosshair' }}
+        style={{ width: W, height: H, background: '#ffffff', border: `1px dashed ${T.hairline}`, borderRadius: 11, touchAction: 'none', cursor: 'crosshair' }}
       />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>

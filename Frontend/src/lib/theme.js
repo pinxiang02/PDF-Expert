@@ -1,15 +1,17 @@
 // Design tokens (Apple-design-analysis) + reusable style helpers.
 
+// Colors resolve to CSS variables (defined in index.css) so a single
+// `data-theme` attribute on <html> flips the whole UI between light and dark.
 export const T = {
-  blue: '#0066cc',
-  blueFocus: '#0071e3',
-  ink: '#1d1d1f',
-  inkMuted80: '#333333',
-  inkMuted48: '#7a7a7a',
-  hairline: '#e0e0e0',
-  canvas: '#ffffff',
-  parchment: '#f5f5f7',
-  pearl: '#fafafc',
+  blue: 'var(--blue)',
+  blueFocus: 'var(--blue-focus)',
+  ink: 'var(--ink)',
+  inkMuted80: 'var(--ink-muted-80)',
+  inkMuted48: 'var(--ink-muted-48)',
+  hairline: 'var(--hairline)',
+  canvas: 'var(--canvas)',
+  parchment: 'var(--parchment)',
+  pearl: 'var(--pearl)',
   display: "system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif",
 };
 
