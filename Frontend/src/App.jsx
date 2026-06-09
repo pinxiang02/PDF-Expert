@@ -284,7 +284,9 @@ function App() {
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Filled_${fileName}`;
+      // Use the (user-editable) name as-is, ensuring a .pdf extension.
+      const base = (fileName || 'document.pdf').trim() || 'document.pdf';
+      link.download = /\.pdf$/i.test(base) ? base : `${base}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -347,6 +349,7 @@ function App() {
         onUpload={handleFileUpload}
         onConvert={handleConvertUpload}
         onMerge={handleMergeUpload}
+        onFileNameChange={setFileName}
         onAddText={addTextBox}
         onAddTick={addTick}
         onAddImage={handleImageUpload}
