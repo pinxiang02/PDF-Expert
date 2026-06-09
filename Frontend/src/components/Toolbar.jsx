@@ -9,7 +9,7 @@ const rowStyle = { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wr
 export default function Toolbar({
   pdfBuffer, fileName, hasOutput, hasWatermark, converting, totalPages, currentPage, zoom,
   canUndo, canRedo, onUndo, onRedo,
-  onUpload, onConvert, onMerge, onFileNameChange, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
+  onUpload, onConvert, onMerge, onScan, onFileNameChange, onAddText, onAddTick, onAddImage, onAddSignature, onWatermark, onPreview, onDownload,
   onPrevPage, onNextPage, onZoomIn, onZoomOut,
 }) {
   const en = !!pdfBuffer;
@@ -31,6 +31,8 @@ export default function Toolbar({
           Merge PDFs
           <input type="file" accept="application/pdf" multiple onChange={onMerge} style={{ display: 'none' }} />
         </label>
+
+        <button onClick={onScan} style={pillGhost(true)} title="Scan documents with your camera">Scan</button>
 
         {en && (
           <input

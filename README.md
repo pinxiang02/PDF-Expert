@@ -9,9 +9,23 @@ the result, and download it — all with an Apple-inspired interface.
 **[https://pdf-expert-virid.vercel.app/](https://pdf-expert-virid.vercel.app/)**
 
 The hosted demo runs the frontend on Vercel, so everything that works in the
-browser is available: PDF editing, watermarks, image → PDF, signatures, and dark
-mode. Word/PowerPoint/Excel conversion needs the LibreOffice backend running and
-reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
+browser is available: PDF editing, watermarks, image → PDF, camera scanning,
+signatures, and dark mode. Word/PowerPoint/Excel conversion needs the LibreOffice
+backend running and reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
+
+## Install on a phone (PWA)
+
+The app is a Progressive Web App, so you can install it to your home screen and
+run it full-screen like a native app — no App Store needed.
+
+**iPhone / iPad (Safari):** open the [live demo](https://pdf-expert-virid.vercel.app/),
+tap the **Share** button, then **Add to Home Screen**. Launch it from the new icon.
+
+**Android (Chrome):** open the site, then use the **Install app** / **Add to Home
+Screen** prompt in the browser menu.
+
+The camera scanner, editing, watermarks and image conversion all work on-device.
+Office → PDF conversion still requires the LibreOffice backend to be reachable.
 
 ## Features
 
@@ -27,10 +41,14 @@ reachable (see [Backend setup](#2-backend-optional--only-for-office--pdf)).
 - **Undo / redo** — revert structural edits (add/move/delete overlays, page
   reorder/delete/rotate, merge, watermark) with the toolbar buttons or
   `Ctrl/Cmd+Z` and `Ctrl/Cmd+Y`. `Delete` removes the selected overlay.
+- **Scan with camera** — capture multiple photos with your device camera and
+  combine them into a multi-page PDF (great on phones). Runs fully in the browser.
 - **Convert to PDF**
   - **Images** (`.jpg`, `.jpeg`, `.png`) — converted entirely in your browser.
   - **Office docs** (`.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`) — converted
     by a local backend running LibreOffice.
+- **Installable (PWA)** — add it to your home screen and run it full-screen like a
+  native app (see [Install on a phone](#install-on-a-phone-pwa)).
 - **Preview & download** the finished PDF.
 
 ## Project layout

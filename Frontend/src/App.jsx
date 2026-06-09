@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { T, pillGhost } from './lib/theme';
 import { buildPdfBytes } from './lib/pdfBuild';
-import { convertToPdf } from './lib/convert';
+import { convertToPdf, imagesToPdf } from './lib/convert';
 import { mergePdfs, reorderPdfPage, deletePdfPage, rotatePdfPage } from './lib/merge';
 import Toolbar from './components/Toolbar';
 import Workspace from './components/Workspace';
@@ -10,6 +10,7 @@ import Thumbnails from './components/Thumbnails';
 import SignatureModal from './components/SignatureModal';
 import PreviewModal from './components/PreviewModal';
 import WatermarkModal from './components/WatermarkModal';
+import CameraModal from './components/CameraModal';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -31,6 +32,7 @@ function App() {
   const [zoom, setZoom] = useState(1);
   const [showSignature, setShowSignature] = useState(false);
   const [showWatermark, setShowWatermark] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [watermark, setWatermark] = useState(null);
   const [converting, setConverting] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
@@ -202,6 +204,19 @@ function App() {
     } catch (err) {
       console.error('Merge error:', err);
       setErrorMessage(`Failed to merge PDFs: ${err.message}`);
+    }
+  };
+
+  // Turn camera-captured photos into a multi-page PDF and load it.
+  const handleCameraCreate = async (dataUrls) => {
+    setShowCamera(false);
+    if (!dataUrls.length) return;
+    try {
+      const bytes = await imagesToPdf(dataUrls);
+      await loadPdfBytes(bytes.buffer.slice(0), 'Scan.pdf');
+    } catch (err) {
+      console.error('Scan error:', err);
+      setErrorMessage(`Failed to create PDF from photos: ${err.message}`);
     }
   };
 
@@ -504,6 +519,7 @@ function App() {
         onUpload={handleFileUpload}
         onConvert={handleConvertUpload}
         onMerge={handleMergeUpload}
+        onScan={() => setShowCamera(true)}
         onFileNameChange={setFileName}
         onAddText={addTextBox}
         onAddTick={addTick}
@@ -556,6 +572,7 @@ function App() {
         </div>
       </div>
 
+      {showCamera && <CameraModal onCancel={() => setShowCamera(false)} onCreate={handleCameraCreate} />}
       {showSignature && <SignatureModal onCancel={() => setShowSignature(false)} onAdd={addSignature} />}
       {showWatermark && (
         <WatermarkModal

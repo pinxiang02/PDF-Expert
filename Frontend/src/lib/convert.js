@@ -27,6 +27,19 @@ async function imageToPdf(file) {
   return await doc.save();
 }
 
+// Build a multi-page PDF from an ordered list of image data URLs (one page per
+// image, sized to the image). Used by the camera scanner. Returns a Uint8Array.
+export async function imagesToPdf(dataUrls) {
+  const doc = await PDFDocument.create();
+  for (const url of dataUrls) {
+    const isPng = /^data:image\/png/i.test(url);
+    const img = isPng ? await doc.embedPng(url) : await doc.embedJpg(url);
+    const page = doc.addPage([img.width, img.height]);
+    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+  }
+  return doc.save();
+}
+
 // Send an Office document to the backend, receive PDF bytes back.
 async function officeToPdf(file) {
   const form = new FormData();
